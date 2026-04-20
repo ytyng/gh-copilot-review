@@ -27,8 +27,8 @@ func ResolveRepo(override string) (repository.Repository, error) {
 	return repository.Current()
 }
 
-// GetCopilotStatus fetches the PR and the list of reviews, then classifies the
-// Copilot state per the rules in ISSUE.md:
+// GetCopilotStatus fetches the PR and the list of reviews, then classifies
+// the Copilot state:
 //   - Copilot is in requested_reviewers  → StateReviewing
 //   - Copilot has reviewed and is no longer requested → StateCompleted
 //   - Otherwise → StateNotRequested

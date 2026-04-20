@@ -102,11 +102,12 @@ func RunWait(args []string) error {
 
 		status, err := ghapi.GetCopilotStatus(client, repo, pr)
 		if err != nil {
-			// Transient API errors shouldn't kill the wait. Update progress
-			// first (clears the current line on a TTY) so the error message
-			// that follows starts on its own line even in non-TTY output.
+			// Transient API errors shouldn't kill the wait. Clear the
+			// progress line before printing so the error appears on its own
+			// line on both TTY and non-TTY output, then redisplay progress.
+			progress.Done()
+			fmt.Fprintf(os.Stderr, "(poll error, retrying): %v\n", err)
 			progress.Update("error")
-			fmt.Fprintf(os.Stderr, "\n(poll error, retrying): %v\n", err)
 			continue
 		}
 		progress.Update(string(status.State))
@@ -117,6 +118,10 @@ func RunWait(args []string) error {
 		if status.State == ghapi.StateCompleted &&
 			status.LatestReview != nil &&
 			status.LatestReview.SubmittedAt.After(baseline) {
+			// Clear the progress line explicitly so the review output
+			// doesn't get concatenated onto it on a TTY. The deferred
+			// Done() still runs as a safety net.
+			progress.Done()
 			fmt.Fprintf(os.Stderr, "review: %s\n", status.LatestReview.HTMLURL)
 			fmt.Println(status.LatestReview.Body)
 			return nil

@@ -71,8 +71,11 @@ gh copilot-review status 42
 The human output intentionally omits the review body; pipe through `--json`
 (or use `wait`) when you need the text itself.
 
-```json
+```sh
 gh copilot-review status 42 --json
+```
+
+```json
 {
   "pr": "https://github.com/owner/repo/pull/42",
   "state": "completed",
