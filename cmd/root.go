@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const rootUsage = `gh-copilot-review - manage GitHub Copilot code review from the CLI.
+const rootUsage = `gh copilot-review - manage GitHub Copilot code review from the CLI.
 
 Usage:
   gh copilot-review <command> [arguments]

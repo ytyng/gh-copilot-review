@@ -27,6 +27,17 @@ func ResolveRepo(override string) (repository.Repository, error) {
 	return repository.Current()
 }
 
+// fetchPR retrieves only the PR metadata (including requested_reviewers),
+// without paginating the full review history.
+func fetchPR(c *api.RESTClient, repo repository.Repository, pr int) (*PullRequest, error) {
+	var p PullRequest
+	path := fmt.Sprintf("repos/%s/%s/pulls/%d", repo.Owner, repo.Name, pr)
+	if err := c.Get(path, &p); err != nil {
+		return nil, fmt.Errorf("fetch PR %s/%s#%d: %w", repo.Owner, repo.Name, pr, err)
+	}
+	return &p, nil
+}
+
 // GetCopilotStatus fetches the PR and the list of reviews, then classifies
 // the Copilot state:
 //   - Copilot is in requested_reviewers  → StateReviewing
@@ -37,10 +48,9 @@ func ResolveRepo(override string) (repository.Repository, error) {
 // regardless of state. This lets callers detect repeat review cycles by
 // comparing timestamps across polls.
 func GetCopilotStatus(c *api.RESTClient, repo repository.Repository, pr int) (*CopilotStatus, error) {
-	var p PullRequest
-	pullPath := fmt.Sprintf("repos/%s/%s/pulls/%d", repo.Owner, repo.Name, pr)
-	if err := c.Get(pullPath, &p); err != nil {
-		return nil, fmt.Errorf("fetch PR %s/%s#%d: %w", repo.Owner, repo.Name, pr, err)
+	p, err := fetchPR(c, repo, pr)
+	if err != nil {
+		return nil, err
 	}
 
 	reviews, err := listReviews(c, repo, pr)
@@ -48,7 +58,7 @@ func GetCopilotStatus(c *api.RESTClient, repo repository.Repository, pr int) (*C
 		return nil, err
 	}
 
-	status := &CopilotStatus{PullRequest: &p, LatestReview: latestCopilotReview(reviews)}
+	status := &CopilotStatus{PullRequest: p, LatestReview: latestCopilotReview(reviews)}
 	switch {
 	case isCopilotRequested(p.RequestedReviewers):
 		status.State = StateReviewing
@@ -70,12 +80,15 @@ func GetCopilotStatus(c *api.RESTClient, repo repository.Repository, pr int) (*C
 // with reviewers=[copilot-pull-request-reviewer[bot]]. Per community report,
 // this works only with a user PAT (not GITHUB_TOKEN or some App tokens).
 func RequestCopilotReview(c *api.RESTClient, repo repository.Repository, pr int) (already bool, prURL string, err error) {
-	status, err := GetCopilotStatus(c, repo, pr)
+	// Only the PR metadata is needed here; paginating the full review history
+	// would be wasteful on large PRs when we just want to check whether
+	// Copilot is already requested.
+	p, err := fetchPR(c, repo, pr)
 	if err != nil {
 		return false, "", err
 	}
-	if status.State == StateReviewing {
-		return true, status.PullRequest.HTMLURL, nil
+	if isCopilotRequested(p.RequestedReviewers) {
+		return true, p.HTMLURL, nil
 	}
 
 	path := fmt.Sprintf("repos/%s/%s/pulls/%d/requested_reviewers", repo.Owner, repo.Name, pr)
@@ -91,7 +104,7 @@ func RequestCopilotReview(c *api.RESTClient, repo repository.Repository, pr int)
 		return false, "", fmt.Errorf("request copilot reviewer on %s/%s#%d: %w", repo.Owner, repo.Name, pr, err)
 	}
 	if resp.HTMLURL == "" {
-		resp.HTMLURL = status.PullRequest.HTMLURL
+		resp.HTMLURL = p.HTMLURL
 	}
 	return false, resp.HTMLURL, nil
 }
