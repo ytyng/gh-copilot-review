@@ -2,14 +2,20 @@ package ghapi
 
 import "time"
 
-// CopilotLogin is the GitHub `login` value reported by the REST API for the
-// Copilot PR reviewer bot. The trailing `[bot]` is part of the login string
-// for this bot user and must be included when calling the
-// `requested_reviewers` endpoint.
+// CopilotLogin is the login to pass to the POST requested_reviewers endpoint
+// and the login GitHub reports on reviews[].user. The trailing `[bot]` is
+// part of the login string in these contexts.
 //
 // Confirmed via community report:
 // https://github.com/orgs/community/discussions/186152
 const CopilotLogin = "copilot-pull-request-reviewer[bot]"
+
+// CopilotRequestedReviewerLogin is the login GitHub returns inside
+// pulls/{n}.requested_reviewers for Copilot. It is the human-readable
+// "Copilot" rather than the bot slug — confirmed empirically against live
+// PRs. Both forms must be checked when detecting the reviewing state,
+// because GitHub may normalize this representation in the future.
+const CopilotRequestedReviewerLogin = "Copilot"
 
 // CopilotState is the high-level state of Copilot on a PR.
 type CopilotState string
