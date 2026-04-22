@@ -136,9 +136,18 @@ func listReviews(c *api.RESTClient, repo repository.Repository, pr int) ([]Revie
 		repo.Owner, repo.Name, pr, maxPages)
 }
 
+// isCopilotRequested reports whether Copilot appears in a PR's
+// requested_reviewers list. GitHub returns login="Copilot" there today, but
+// has historically used the bot slug in other contexts, so both forms are
+// accepted to stay robust against future API normalization. The short
+// "Copilot" form is also a valid (case-sensitive) human username, so it
+// must additionally carry Type=="Bot" to avoid a false positive.
 func isCopilotRequested(reviewers []User) bool {
 	for _, u := range reviewers {
 		if u.Login == CopilotLogin {
+			return true
+		}
+		if u.Login == CopilotRequestedReviewerLogin && u.Type == "Bot" {
 			return true
 		}
 	}
