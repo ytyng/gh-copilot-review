@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -22,17 +23,24 @@ Run "gh copilot-review <command> -h" for command-specific flags.
 // Run dispatches subcommands. It returns an exit code.
 func Run(args []string) int {
 	if err := dispatch(args); err != nil {
-		var exit *ExitError
-		if errors.As(err, &exit) {
-			if exit.Err != nil {
-				fmt.Fprintln(os.Stderr, "gh-copilot-review:", exit.Err)
-			}
-			return exit.Code
-		}
-		fmt.Fprintln(os.Stderr, "gh-copilot-review:", err)
-		return 1
+		return reportError(os.Stderr, err)
 	}
 	return 0
+}
+
+// reportError prints err and maps it to a process exit code. Split out from
+// Run so the mapping can be tested without dispatching a subcommand (every
+// subcommand talks to the GitHub API).
+func reportError(w io.Writer, err error) int {
+	var exit *ExitError
+	if errors.As(err, &exit) {
+		if exit.Err != nil {
+			fmt.Fprintln(w, "gh-copilot-review:", exit.Err)
+		}
+		return exit.Code
+	}
+	fmt.Fprintln(w, "gh-copilot-review:", err)
+	return 1
 }
 
 func dispatch(args []string) error {
